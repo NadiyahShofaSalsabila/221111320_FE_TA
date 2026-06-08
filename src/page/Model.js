@@ -1,4 +1,8 @@
-import React, { useRef, useState } from "react";
+import React, {
+    useEffect,
+    useRef,
+    useState
+} from "react";
 import {
     FaUpload,
     FaEdit,
@@ -6,18 +10,8 @@ import {
 } from "react-icons/fa";
 
 export default function Model() {
-    const [models, setModels] = useState([
-        {
-            id: 1,
-            nama: "LSTM",
-            timestep: 2,
-        },
-        {
-            id: 2,
-            nama: "BiLSTM",
-            timestep: 2,
-        },
-    ]);
+    const [models, setModels] = useState([]);
+    const [uploading, setUploading] = useState(false);
 
     // ================= MODAL STATE =================
     const [showTambahModal, setShowTambahModal] = useState(false);
@@ -37,72 +31,206 @@ export default function Model() {
     const tambahFileRef = useRef(null);
     const editFileRef = useRef(null);
 
+    const fetchModels = async () => {
+
+        try {
+
+            const response = await fetch(
+                "http://localhost:5000/api/models"
+            );
+
+            const data = await response.json();
+
+            setModels(data);
+
+        } catch (error) {
+
+            console.error(error);
+
+        }
+
+    };
+
+    useEffect(() => {
+
+        fetchModels();
+
+    }, []);
+
+
+
     // ================= TAMBAH MODEL =================
-    const handleTambahModel = () => {
-        if (!namaModel || !timeStep) {
-            alert("Nama Model dan TimeStep wajib diisi!");
+    const handleTambahModel = async () => {
+
+        if (!selectedFile) {
+            alert("Pilih file model");
             return;
         }
 
-        const newModel = {
-            id: models.length + 1,
-            nama: namaModel,
-            timestep: timeStep,
-        };
+        if (!timeStep) {
+            alert("TimeStep wajib diisi");
+            return;
+        }
 
-        setModels([...models, newModel]);
+        try {
 
-        setNamaModel("");
-        setTimeStep("");
-        setSelectedFile(null);
+            setUploading(true);
 
-        setShowTambahModal(false);
+            const formData =
+                new FormData();
+
+            formData.append(
+                "nama_model",
+                namaModel
+            );
+
+            formData.append(
+                "model",
+                selectedFile
+            );
+
+            formData.append(
+                "timestep",
+                timeStep
+            );
+
+            const response =
+                await fetch(
+                    "http://localhost:5000/api/models/upload",
+                    {
+                        method: "POST",
+                        body: formData
+                    }
+                );
+
+            const result =
+                await response.json();
+
+            alert(result.message);
+
+            fetchModels();
+
+            setShowTambahModal(false);
+
+            setSelectedFile(null);
+            setTimeStep("");
+
+        } catch (error) {
+
+            console.error(error);
+
+        }
+
+        setUploading(false);
+
     };
 
     // ================= EDIT MODEL =================
     const bukaEditModal = (model) => {
-        setEditId(model.id);
-        setEditNamaModel(model.nama);
+        setEditId(model.id_model);
+        setEditNamaModel(model.nama_model);
         setEditTimeStep(model.timestep);
         setEditFile(null);
 
         setShowEditModal(true);
     };
 
-    const simpanPerubahan = () => {
-        if (!editNamaModel || !editTimeStep) {
-            alert("Nama Model dan TimeStep wajib diisi!");
-            return;
-        }
+    const simpanPerubahan =
+        async () => {
 
-        const updatedModels = models.map((item) =>
-            item.id === editId
-                ? {
-                    ...item,
-                    nama: editNamaModel,
-                    timestep: editTimeStep,
+            try {
+
+                const formData =
+                    new FormData();
+
+                formData.append(
+                    "nama_model",
+                    editNamaModel
+                );
+
+                formData.append(
+                    "timestep",
+                    editTimeStep
+                );
+
+                if (editFile) {
+
+                    formData.append(
+                        "model",
+                        editFile
+                    );
+
                 }
-                : item
-        );
 
-        setModels(updatedModels);
-        setShowEditModal(false);
-    };
+                const response =
+                    await fetch(
+                        `http://localhost:5000/api/models/${editId}`,
+                        {
+                            method: "PUT",
+                            body: formData
+                        }
+                    );
+
+                const result =
+                    await response.json();
+
+                alert(result.message);
+
+                fetchModels();
+
+                setShowEditModal(false);
+
+            } catch (error) {
+
+                console.error(error);
+
+            }
+
+        };
 
     // ================= HAPUS =================
-    const handleDelete = (id) => {
-        const confirmDelete = window.confirm(
-            "Yakin ingin menghapus model ini?"
-        );
+    const handleDelete = async (id) => {
 
-        if (confirmDelete) {
-            setModels(models.filter((item) => item.id !== id));
+        if (
+            !window.confirm(
+                "Yakin ingin menghapus model?"
+            )
+        ) return;
+
+        try {
+
+            const response =
+                await fetch(
+                    `http://localhost:5000/api/models/${id}`,
+                    {
+                        method: "DELETE"
+                    }
+                );
+
+            const result =
+                await response.json();
+
+            alert(result.message);
+
+            fetchModels();
+
+        } catch (error) {
+
+            console.error(error);
+
         }
+
     };
 
     // ================= FILE VALIDATION =================
     const validateFile = (file) => {
-        if (!file.name.toLowerCase().endsWith(".h5")) {
+        const filename =
+            file.name.toLowerCase();
+
+        if (
+            !filename.endsWith(".h5") &&
+            !filename.endsWith(".keras")
+        ) {
             alert("Hanya file .h5 yang diperbolehkan!");
             return false;
         }
@@ -147,9 +275,9 @@ export default function Model() {
 
                             <tbody>
                                 {models.map((model, index) => (
-                                    <tr key={model.id} className="text-center">
+                                    <tr key={model.id_model} className="text-center">
                                         <td>{index + 1}</td>
-                                        <td>{model.nama}</td>
+                                        <td>{model.nama_model}</td>
                                         <td>{model.timestep}</td>
 
                                         <td>
@@ -165,7 +293,11 @@ export default function Model() {
 
                                                 <button
                                                     className="btn btn-danger btn-sm d-flex align-items-center gap-1"
-                                                    onClick={() => handleDelete(model.id)}
+                                                    onClick={() =>
+                                                        handleDelete(
+                                                            model.id_model
+                                                        )
+                                                    }
                                                 >
                                                     <FaTrash />
                                                     HAPUS
@@ -236,7 +368,7 @@ export default function Model() {
 
                                         <input
                                             type="file"
-                                            accept=".h5"
+                                            accept=".h5,.keras"
                                             hidden
                                             ref={tambahFileRef}
                                             onChange={(e) => {

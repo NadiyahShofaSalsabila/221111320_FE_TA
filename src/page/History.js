@@ -1,45 +1,92 @@
-import React, { useState } from "react";
+import React, {
+    useState,
+    useEffect
+} from "react";
 import { FaTrash } from "react-icons/fa";
 
 export default function History() {
-    const [historyData, setHistoryData] = useState([
-        {
-            id: 1,
-            date: "2026-04-07",
-            model: "LSTM",
-            prediction: "2,920",
-        },
-        {
-            id: 2,
-            date: "2026-04-08",
-            model: "BiLSTM",
-            prediction: "2,945",
-        },
-        {
-            id: 3,
-            date: "2026-04-09",
-            model: "LSTM",
-            prediction: "2,970",
-        },
-        {
-            id: 4,
-            date: "2026-04-10",
-            model: "BiLSTM",
-            prediction: "3,010",
-        },
-    ]);
+    const [historyData, setHistoryData] = useState([]);
+
+    const fetchHistory = async () => {
+        try {
+            const response = await fetch(
+                "http://localhost:5000/api/predictions"
+            );
+
+            const data = await response.json();
+
+            setHistoryData(data);
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    useEffect(() => {
+        fetchHistory();
+    }, []);
 
     // ================= DELETE HISTORY =================
-    const handleDelete = (id) => {
+    const handleDelete = async (id) => {
+
         const confirmDelete = window.confirm(
             "Yakin ingin menghapus history prediksi ini?"
         );
 
-        if (confirmDelete) {
-            setHistoryData(
-                historyData.filter((item) => item.id !== id)
+        if (!confirmDelete) return;
+
+        try {
+
+            const response = await fetch(
+                `http://localhost:5000/api/predictions/${id}`,
+                {
+                    method: "DELETE"
+                }
             );
+
+            const data = await response.json();
+
+            if (data.success) {
+
+                setHistoryData(
+                    historyData.filter(
+                        item =>
+                            item.id_prediksi !== id
+                    )
+                );
+
+            } else {
+
+                alert(data.message);
+
+            }
+
+        } catch (error) {
+
+            console.error(error);
+
         }
+
+    };
+
+    const formatDate = (dateString) => {
+        return new Date(dateString).toLocaleDateString(
+            "id-ID",
+            {
+                day: "2-digit",
+                month: "short",
+                year: "numeric"
+            }
+        );
+    };
+
+    const formatPrice = (price) => {
+        return Number(price).toLocaleString(
+            "id-ID",
+            {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 3
+            }
+        );
     };
 
     return (
@@ -73,20 +120,34 @@ export default function History() {
                             <tbody>
                                 {historyData.length > 0 ? (
                                     historyData.map((item) => (
-                                        <tr key={item.id} className="text-center">
+                                        <tr key={item.id_prediksi} className="text-center">
 
-                                            <td>{item.date}</td>
+                                            <td>
+                                                {formatDate(
+                                                    item.date_prediksi
+                                                )}
+                                            </td>
 
-                                            <td>{item.model}</td>
+                                            <td>
+                                                {item.nama_model}
+                                            </td>
 
-                                            <td>{item.prediction}</td>
+                                            <td>
+                                                {formatPrice(
+                                                    item.harga_prediksi
+                                                )}
+                                            </td>
 
                                             <td>
                                                 <div className="d-flex justify-content-center">
 
                                                     <button
                                                         className="btn btn-danger btn-sm d-flex align-items-center gap-2"
-                                                        onClick={() => handleDelete(item.id)}
+                                                        onClick={() =>
+                                                            handleDelete(
+                                                                item.id_prediksi
+                                                            )
+                                                        }
                                                     >
                                                         <FaTrash />
                                                         HAPUS

@@ -1,262 +1,499 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, {
+    useEffect,
+    useState
+} from "react";
 
-const dummyData = [
-    {
-        date: "2026-04-01",
-        close: "2850",
-        high: "2920",
-        low: "2810",
-        open: "2870",
-    },
-    {
-        date: "2026-04-02",
-        close: "2860",
-        high: "2900",
-        low: "2830",
-        open: "2845",
-    },
-    {
-        date: "2026-04-03",
-        close: "2810",
-        high: "2870",
-        low: "2780",
-        open: "2855",
-    },
-    {
-        date: "2026-04-04",
-        close: "2795",
-        high: "2840",
-        low: "2760",
-        open: "2810",
-    },
-    {
-        date: "2026-04-05",
-        close: "2820",
-        high: "2880",
-        low: "2790",
-        open: "2830",
-    },
-];
+import {
+    useNavigate
+} from "react-router-dom";
 
-const models = [
-    {
-        name: "LSTM",
-        timestep: 2,
-    },
-    {
-        name: "BiLSTM",
-        timestep: 3,
-    },
-];
+const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString("id-ID", {
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+    });
+};
+
+const formatPrice = (price) => {
+    return Number(price).toLocaleString("id-ID", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 3
+    });
+};
 
 export default function Predict() {
+
     const navigate = useNavigate();
 
-    const [selectedModel, setSelectedModel] = useState("");
-    const [selectedTimeStep, setSelectedTimeStep] = useState(0);
-    const [inputData, setInputData] = useState([]);
-    const [result, setResult] = useState(null);
+    const [models, setModels] = useState([]);
 
-    // ================= LOAD DATA =================
-    const handleModelChange = (e) => {
-        const modelName = e.target.value;
+    const [selectedModel, setSelectedModel] =
+        useState("");
 
-        setSelectedModel(modelName);
+    const [selectedTimeStep, setSelectedTimeStep] =
+        useState(0);
 
-        if (!modelName) {
-            setInputData([]);
-            setSelectedTimeStep(0);
-            return;
+    const [inputData, setInputData] =
+        useState([]);
+
+    const [result, setResult] =
+        useState(null);
+
+    const [loading, setLoading] =
+        useState(false);
+
+    // =====================================
+    // LOAD MODEL
+    // =====================================
+
+    const fetchModels = async () => {
+
+        try {
+
+            const response =
+                await fetch(
+                    "http://localhost:5000/api/models"
+                );
+
+            const data =
+                await response.json();
+
+            setModels(data);
+
+        } catch (error) {
+
+            console.error(error);
+
         }
 
-        const selected = models.find(
-            (item) => item.name === modelName
-        );
-
-        const timestep = selected.timestep;
-
-        setSelectedTimeStep(timestep);
-
-        const dataToShow = dummyData.slice(0, timestep);
-
-        setInputData(dataToShow);
-
-        // reset result
-        setResult(null);
     };
 
-    // ================= PREDIKSI =================
-    const jalankanPrediksi = () => {
-        if (!selectedModel || inputData.length === 0) return;
+    useEffect(() => {
 
-        const lastDateStr =
-            inputData[inputData.length - 1].date;
+        fetchModels();
 
-        const lastDate = new Date(lastDateStr);
+    }, []);
 
-        const nextDate = new Date(lastDate);
+    // =====================================
+    // PILIH MODEL
+    // =====================================
 
-        nextDate.setDate(nextDate.getDate() + 1);
+    const handleModelChange =
+        async (e) => {
 
-        const formattedDate = nextDate
-            .toISOString()
-            .split("T")[0];
+            const modelId =
+                e.target.value;
 
-        const displayDate = formattedDate
-            .split("-")
-            .reverse()
-            .join("/");
+            setSelectedModel(
+                modelId
+            );
 
-        setResult({
-            date: formattedDate,
-            displayDate,
-            model: selectedModel,
-            prediction: "Rp 2,985",
-        });
-    };
+            setResult(null);
+
+            if (!modelId) {
+
+                setInputData([]);
+                setSelectedTimeStep(0);
+
+                return;
+
+            }
+
+            try {
+
+                const selected =
+                    models.find(
+                        item =>
+                            item.id_model ===
+                            Number(modelId)
+                    );
+
+                if (!selected)
+                    return;
+
+                setSelectedTimeStep(
+                    selected.timestep
+                );
+
+                const response =
+                    await fetch(
+                        "http://localhost:5000/api/stocks"
+                    );
+
+                const stocks =
+                    await response.json();
+
+                const latestData =
+                    stocks.slice(
+                        0,
+                        selected.timestep
+                    );
+
+                setInputData(
+                    [...latestData].reverse()
+                );
+
+            } catch (error) {
+
+                console.error(error);
+
+            }
+
+        };
+
+    // =====================================
+    // PREDIKSI
+    // =====================================
+
+    const jalankanPrediksi =
+        async () => {
+
+            try {
+
+                setLoading(true);
+
+                const response =
+                    await fetch(
+                        "http://localhost:5000/api/predict",
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+                            body: JSON.stringify({
+                                id_model:
+                                    Number(
+                                        selectedModel
+                                    )
+                            })
+                        }
+                    );
+
+                const data =
+                    await response.json();
+
+                if (!data.success) {
+
+                    alert(
+                        data.message
+                    );
+
+                    setLoading(false);
+
+                    return;
+
+                }
+
+                const selected =
+                    models.find(
+                        item =>
+                            item.id_model ===
+                            Number(
+                                selectedModel
+                            )
+                    );
+
+                setResult({
+                    date:
+                        data.date_prediksi,
+                    model:
+                        selected.nama_model,
+                    prediction:
+                        data.harga_prediksi
+                });
+
+            } catch (error) {
+
+                console.error(error);
+
+            }
+
+            setLoading(false);
+
+        };
 
     return (
         <main className="py-5 bg-light min-vh-100">
+
             <div className="container">
 
-                {/* Title */}
+                {/* TITLE */}
+
                 <div className="text-center mb-5">
+
                     <h1 className="fw-bold">
                         PREDIKSI HARGA SAHAM
                         <br />
                         DENGAN PRE-TRAINED MODEL
                     </h1>
+
                 </div>
 
-                {/* Card */}
+                {/* CARD */}
+
                 <div className="card border-0 shadow rounded-4 p-4">
 
-                    {/* Select Model */}
+                    {/* MODEL */}
+
                     <div className="mb-4 d-flex align-items-center gap-3">
 
                         <label className="fw-semibold mb-0">
-                            Model:
+                            Model :
                         </label>
 
                         <select
                             className="form-select"
-                            style={{ maxWidth: "300px" }}
-                            value={selectedModel}
-                            onChange={handleModelChange}
+                            style={{
+                                maxWidth:
+                                    "350px"
+                            }}
+                            value={
+                                selectedModel
+                            }
+                            onChange={
+                                handleModelChange
+                            }
                         >
-                            <option value="">Pilih Model</option>
 
-                            {models.map((model, index) => (
-                                <option
-                                    key={index}
-                                    value={model.name}
-                                >
-                                    {model.name} (TimeStep: {model.timestep})
-                                </option>
-                            ))}
+                            <option value="">
+                                Pilih Model
+                            </option>
+
+                            {models.map(
+                                (
+                                    model
+                                ) => (
+                                    <option
+                                        key={
+                                            model.id_model
+                                        }
+                                        value={
+                                            model.id_model
+                                        }
+                                    >
+                                        {
+                                            model.nama_model
+                                        }
+                                        {" "}
+                                        (
+                                        TimeStep:
+                                        {" "}
+                                        {
+                                            model.timestep
+                                        }
+                                        )
+                                    </option>
+                                )
+                            )}
+
                         </select>
+
                     </div>
 
-                    {/* Input Data */}
-                    {inputData.length > 0 && (
-                        <div className="mb-4">
+                    {/* HISTORICAL DATA */}
 
-                            <h4 className="fw-bold mb-3">
-                                Data Input (Historical Data)
-                            </h4>
+                    {inputData.length >
+                        0 && (
 
-                            <div className="table-responsive">
-                                <table className="table table-bordered table-hover">
+                            <div className="mb-4">
 
-                                    <thead className="table-dark text-center">
-                                        <tr>
-                                            <th>DATE</th>
-                                            <th>CLOSE</th>
-                                            <th>HIGH</th>
-                                            <th>LOW</th>
-                                            <th>OPEN</th>
-                                        </tr>
-                                    </thead>
+                                <h4 className="fw-bold mb-3">
+                                    Data Input
+                                    (Historical
+                                    Data)
+                                </h4>
 
-                                    <tbody>
-                                        {inputData.map((row, index) => (
-                                            <tr key={index} className="text-center">
-                                                <td>{row.date}</td>
-                                                <td>{row.close}</td>
-                                                <td>{row.high}</td>
-                                                <td>{row.low}</td>
-                                                <td>{row.open}</td>
+                                <div className="table-responsive">
+
+                                    <table className="table table-bordered table-hover">
+
+                                        <thead className="table-dark text-center">
+
+                                            <tr>
+                                                <th>
+                                                    DATE
+                                                </th>
+                                                <th>
+                                                    OPEN
+                                                </th>
+                                                <th>
+                                                    HIGH
+                                                </th>
+                                                <th>
+                                                    LOW
+                                                </th>
+                                                <th>
+                                                    CLOSE
+                                                </th>
+
                                             </tr>
-                                        ))}
-                                    </tbody>
 
-                                </table>
+                                        </thead>
+
+                                        <tbody>
+
+                                            {inputData.map(
+                                                (
+                                                    row,
+                                                    index
+                                                ) => (
+                                                    <tr
+                                                        key={
+                                                            index
+                                                        }
+                                                        className="text-center"
+                                                    >
+                                                        <td>
+                                                            {
+                                                                formatDate(row.date)
+                                                            }
+                                                        </td>
+
+                                                        <td>
+                                                            {
+                                                                formatPrice(row.open_price)
+                                                            }
+                                                        </td>
+                                                        <td>
+                                                            {
+                                                                formatPrice(row.high_price)
+                                                            }
+                                                        </td>
+                                                        <td>
+                                                            {
+                                                                formatPrice(row.low_price)
+                                                            }
+                                                        </td>
+                                                        <td>
+                                                            {
+                                                                formatPrice(row.close_price)
+                                                            }
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            )}
+
+                                        </tbody>
+
+                                    </table>
+
+                                </div>
+
                             </div>
-                        </div>
-                    )}
 
-                    {/* Predict Button */}
+                        )}
+
+                    {/* BUTTON */}
+
                     <div className="text-center mb-4">
+
                         <button
                             className="btn btn-primary btn-lg px-5"
-                            disabled={!selectedModel}
-                            onClick={jalankanPrediksi}
+                            disabled={
+                                !selectedModel ||
+                                loading
+                            }
+                            onClick={
+                                jalankanPrediksi
+                            }
                         >
-                            PREDIKSI
+
+                            {loading
+                                ? "MEMPROSES..."
+                                : "PREDIKSI"}
+
                         </button>
+
                     </div>
 
-                    {/* Result */}
+                    {/* HASIL */}
+
                     {result && (
+
                         <div className="mt-4">
 
                             <h2 className="fw-bold text-center mb-4">
-                                HASIL PREDIKSI HARGA SAHAM
+
+                                HASIL PREDIKSI
+                                HARGA SAHAM
+
                             </h2>
 
-                            <div className="alert alert-info fs-5">
-                                <strong>Prediksi Harga:</strong>{" "}
-                                {result.displayDate}
-                            </div>
-
                             <div className="table-responsive">
+
                                 <table className="table table-bordered table-hover">
 
                                     <thead className="table-dark text-center">
+
                                         <tr>
-                                            <th>DATE</th>
-                                            <th>MODEL</th>
-                                            <th>HASIL PREDIKSI</th>
+                                            <th>
+                                                DATE
+                                            </th>
+                                            <th>
+                                                MODEL
+                                            </th>
+                                            <th>
+                                                HASIL PREDIKSI
+                                            </th>
                                         </tr>
+
                                     </thead>
 
                                     <tbody>
+
                                         <tr className="text-center">
-                                            <td>{result.date}</td>
-                                            <td>{result.model}</td>
-                                            <td>{result.prediction}</td>
+
+                                            <td>
+                                                {
+                                                    formatDate(result.date)
+                                                }
+                                            </td>
+
+                                            <td>
+                                                {
+                                                    result.model
+                                                }
+                                            </td>
+
+                                            <td>
+                                                {formatPrice(result.prediction)}
+                                            </td>
+
                                         </tr>
+
                                     </tbody>
 
                                 </table>
+
                             </div>
 
-                            {/* History Button */}
                             <div className="text-center mt-4">
+
                                 <button
                                     className="btn btn-secondary px-4 py-2"
-                                    onClick={() => navigate("/history")}
+                                    onClick={() =>
+                                        navigate(
+                                            "/history"
+                                        )
+                                    }
                                 >
-                                    HISTORY PREDIKSI
+                                    HISTORY
+                                    PREDIKSI
                                 </button>
+
                             </div>
 
                         </div>
+
                     )}
 
                 </div>
+
             </div>
+
         </main>
     );
 }
