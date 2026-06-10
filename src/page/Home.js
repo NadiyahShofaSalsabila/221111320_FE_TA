@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import slide1 from "../assets/slide1.jpg";
+import slide2 from "../assets/slide2.jpg";
+import slide3 from "../assets/slide3.jpg";
+import slide4 from "../assets/slide4.jpg";
 
 const images = [
-    "https://picsum.photos/id/1015/800/500",
-    "https://picsum.photos/id/201/800/500",
-    "https://picsum.photos/id/237/800/500",
-    "https://picsum.photos/id/870/800/500",
+    slide1,
+    slide2,
+    slide3,
+    slide4,
 ];
 
 export default function Home() {
@@ -27,17 +31,17 @@ export default function Home() {
     return (
         <main className="py-5">
             <div className="container">
-
                 <div className="row justify-content-center">
                     <div className="col-lg-8">
                         {/* Slideshow */}
                         <div className="card border-0 shadow-lg overflow-hidden rounded-4">
                             <img
                                 src={images[currentSlide]}
-                                alt="Slideshow"
+                                alt={`Slide ${currentSlide + 1}`}
                                 className="img-fluid"
                                 style={{
                                     height: "390px",
+                                    width: "100%",
                                     objectFit: "cover",
                                     transition: "0.5s ease",
                                 }}
@@ -64,10 +68,8 @@ export default function Home() {
                                 START
                             </button>
                         </div>
-
                     </div>
                 </div>
-
             </div>
         </main>
     );
