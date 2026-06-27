@@ -145,8 +145,6 @@ export default function Data() {
 
                     <h1 className="fw-bold text-dark">
                         DATA HARGA SAHAM
-                        <br />
-                        PT ANEKA TAMBANG TBK
                     </h1>
 
                 </div>
